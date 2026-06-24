@@ -17,8 +17,16 @@ RUN_ID = "resnet50_adam_lr1e-3_bs64"
 device = "cuda"
 print("device:", device)
 
-# csv log file
-LOG_PATH = "training_log.csv"
+# project paths
+PROJECT_ROOT = "/data/allen516/resnet50_cifar100"
+DATA_ROOT = "/local_datasets/allen516/cifar100"
+LOG_PATH = f"{PROJECT_ROOT}/logs/training_log.csv" # csv file to save training log
+CKPT_PATH = f"{PROJECT_ROOT}/checkpoints/resnet50_cifar100.pth"
+
+os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+os.makedirs(os.path.dirname(CKPT_PATH), exist_ok=True)
+
+assert torch.cuda.is_available(), "CUDA GPU가 할당된 Slurm job 안에서 실행해야 합니다."
 
 if not os.path.exists(LOG_PATH) or os.path.getsize(LOG_PATH) == 0:
     with open(LOG_PATH, "w", newline="") as f:
@@ -33,8 +41,8 @@ train_tf = transforms.Compose([transforms.Resize(224), transforms.RandomHorizont
 test_tf = transforms.Compose([transforms.Resize(224), transforms.ToTensor(), transforms.Normalize(mean, std), ])
 
 # CIFAR-100 download/load
-train_set = datasets.CIFAR100( root="./data", train=True, download=True, transform=train_tf, )
-test_set = datasets.CIFAR100( root="./data", train=False, download=True, transform=test_tf, )
+train_set = datasets.CIFAR100( root=DATA_ROOT, train=True, download=True, transform=train_tf, )
+test_set = datasets.CIFAR100( root=DATA_ROOT, train=False, download=True, transform=test_tf, )
 
 train_loader = DataLoader( train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, )
 test_loader = DataLoader( test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, )
@@ -101,6 +109,6 @@ for epoch in range(EPOCHS):
         writer = csv.writer(f)
         writer.writerow([RUN_ID, epoch + 1, BATCH_SIZE, EPOCHS, LR, "Adam", train_loss, train_acc, test_acc])
 
-torch.save(model.state_dict(), "resnet50_cifar100.pth")
-print("saved: resnet50_cifar100.pth")
+torch.save(model.state_dict(), CKPT_PATH)
+print("saved:", CKPT_PATH)
 print("saved:", LOG_PATH)
