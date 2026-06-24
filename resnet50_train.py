@@ -19,6 +19,9 @@ print("device:", device)
 
 # project paths
 PROJECT_ROOT = "/data/allen516/resnet50_cifar100"
+TORCH_HOME = f"{PROJECT_ROOT}/cache/torch"
+os.environ["TORCH_HOME"] = TORCH_HOME
+os.makedirs(TORCH_HOME, exist_ok=True)
 DATA_ROOT = "/local_datasets/allen516/cifar100"
 LOG_PATH = f"{PROJECT_ROOT}/logs/training_log.csv" # csv file to save training log
 CKPT_PATH = f"{PROJECT_ROOT}/checkpoints/resnet50_cifar100.pth"
