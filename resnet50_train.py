@@ -74,7 +74,11 @@ os.environ["TORCH_HOME"] = TORCH_HOME
 
 DATA_ROOT = "/local_datasets/allen516/cifar100"
 LOG_PATH = f"{PROJECT_ROOT}/logs/{RUN_ID}.csv"
-CKPT_PATH = f"{PROJECT_ROOT}/checkpoints/{RUN_ID}_best.pth"
+
+if MODE == "tune":
+    CKPT_PATH = f"{PROJECT_ROOT}/checkpoints/{RUN_ID}_best_val.pth"
+else:
+    CKPT_PATH = f"{PROJECT_ROOT}/checkpoints/{RUN_ID}_final.pth"
 
 os.makedirs(TORCH_HOME, exist_ok=True)
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -148,6 +152,15 @@ test_set = datasets.CIFAR100(
     transform=eval_tf,
 )
 
+# tune / final 모두 마지막에 test accuracy를 기록하므로 항상 생성
+test_loader = DataLoader(
+    test_set,
+    batch_size=BATCH_SIZE,
+    shuffle=False,
+    num_workers=NUM_WORKERS,
+    pin_memory=True,
+)
+
 
 # tune mode:
 # 50,000 train images -> 45,000 train + 5,000 validation
@@ -155,6 +168,7 @@ test_set = datasets.CIFAR100(
 # 선택된 hyperparameter로 전체 50,000 train images 사용
 if MODE == "tune":
     generator = torch.Generator().manual_seed(SEED)
+
     indices = torch.randperm(
         len(train_dataset_for_split),
         generator=generator,
@@ -192,14 +206,6 @@ else:
         train_set,
         batch_size=BATCH_SIZE,
         shuffle=True,
-        num_workers=NUM_WORKERS,
-        pin_memory=True,
-    )
-
-    test_loader = DataLoader(
-        test_set,
-        batch_size=BATCH_SIZE,
-        shuffle=False,
         num_workers=NUM_WORKERS,
         pin_memory=True,
     )
@@ -283,7 +289,7 @@ def evaluate(loader):
     return acc
 
 
-# tune mode에서는 validation accuracy가 최고인 weight 저장
+# tune mode에서는 validation accuracy가 최고인 checkpoint 저장
 best_val_acc = -1.0
 
 for epoch in range(EPOCHS):
@@ -333,20 +339,59 @@ for epoch in range(EPOCHS):
         ])
 
 
-# final mode에서는 전체 train data로 학습한 뒤 test를 마지막에 한 번만 측정
-if MODE == "final":
+# tune:
+# best validation checkpoint 기준 test accuracy 기록
+if MODE == "tune":
+    model.load_state_dict(
+        torch.load(
+            CKPT_PATH,
+            map_location=device,
+            weights_only=True,
+        )
+    )
+
     test_acc = evaluate(test_loader)
 
-    torch.save(model.state_dict(), CKPT_PATH)
-
-    print(f"Final test acc: {test_acc:.2f}%")
+    print(f"best validation acc: {best_val_acc:.2f}%")
+    print(f"test acc of best validation checkpoint: {test_acc:.2f}%")
 
     with open(LOG_PATH, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             RUN_ID,
             MODE,
-            "final",
+            "best_val_test",
+            BATCH_SIZE,
+            EPOCHS,
+            LR,
+            OPTIMIZER_NAME,
+            WEIGHT_DECAY,
+            SEED,
+            "",
+            "",
+            best_val_acc,
+            test_acc,
+        ])
+
+    print("saved best validation checkpoint:", CKPT_PATH)
+    print("saved log:", LOG_PATH)
+
+
+# final:
+# 전체 train set으로 학습한 마지막 checkpoint 기준 test accuracy 기록
+else:
+    test_acc = evaluate(test_loader)
+
+    torch.save(model.state_dict(), CKPT_PATH)
+
+    print(f"final test acc: {test_acc:.2f}%")
+
+    with open(LOG_PATH, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            RUN_ID,
+            MODE,
+            "final_test",
             BATCH_SIZE,
             EPOCHS,
             LR,
@@ -359,10 +404,5 @@ if MODE == "final":
             test_acc,
         ])
 
-    print("saved checkpoint:", CKPT_PATH)
-    print("saved log:", LOG_PATH)
-
-else:
-    print(f"best validation acc: {best_val_acc:.2f}%")
-    print("saved best checkpoint:", CKPT_PATH)
+    print("saved final checkpoint:", CKPT_PATH)
     print("saved log:", LOG_PATH)
