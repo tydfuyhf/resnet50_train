@@ -297,7 +297,7 @@ for epoch in range(EPOCHS):
 
     if MODE == "tune":
         val_acc = evaluate(val_loader)
-        test_acc = ""
+        test_acc = evaluate(test_loader)
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -307,17 +307,19 @@ for epoch in range(EPOCHS):
             f"Epoch {epoch + 1}/{EPOCHS} | "
             f"loss: {train_loss:.4f} | "
             f"train acc: {train_acc:.2f}% | "
-            f"val acc: {val_acc:.2f}%"
+            f"val acc: {val_acc:.2f}% | "
+            f"test acc: {test_acc:.2f}%"
         )
 
     else:
         val_acc = ""
-        test_acc = ""
+        test_acc = evaluate(test_loader)
 
         print(
             f"Epoch {epoch + 1}/{EPOCHS} | "
             f"loss: {train_loss:.4f} | "
             f"train acc: {train_acc:.2f}%"
+            f"test acc: {test_acc:.2f}%"
         )
 
     with open(LOG_PATH, "a", newline="") as f:
